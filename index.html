@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Lunar Lander - A Holdraszállás</title>
+    <style>
+        body { 
+            background: #0b0d17; 
+            color: #e0e0e0; 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            text-align: center; 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        /* A játéktér vizuális stílusa */
+        canvas { 
+            border: 3px solid #444; 
+            background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            margin-top: 10px;
+            display: inline-block;
+        }
+        .ui-panel {
+            display: flex;
+            justify-content: space-around;
+            width: 800px;
+            margin: 10px auto;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-val { color: #00ffcc; font-weight: bold; font-family: monospace; font-size: 1.2em; }
+        .instructions { font-size: 0.9em; color: #aaa; margin: 5px; }
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover { background: #2ecc71; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 Lunar Lander: A Küldetés</h1>
+    
+    <div class="instructions">
+        <strong>Szabály:</strong> Érj földet a piros zónán! <br>
+        Nyilak: [FEL] Gáz, [BAL/JOBB] Forgás. Sebesség max: 1.2, Dőlés max: 15°.
+    </div>
+
+    <div class="ui-panel">
+        <div>Üzemanyag: <span id="fuel" class="stat-val">100</span>%</div>
+        <div>Dőlés: <span id="angle" class="stat-val">0</span>°</div>
+        <div>Süllyedés: <span id="speed" class="stat-val">0</span></div>
+        <div>Élet: <span id="lives" class="stat-val">3</span></div>
+        <div>Pont: <span id="score" class="stat-val">0</span></div>
+    </div>
+
+    <canvas id="landerCanvas" width="800" height="450"></canvas>
+    
+    <br>
+    <button onclick="resetGame()">Új Játék Indítása</button>
+
+    <script>
+        const canvas = document.getElementById("landerCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Játék állapot változók
+        let x, y, vx, vy, angle, fuel, lives = 3, score = 0, gameOver = false;
+        let keys = {};
+
+        // Fizikai állandók
+        const gravity = 0.015;
+        const thrustPower = 0.045;
+        const rotationSpeed = 0.06;
+        const landingPad = { x: 350, y: 420, width: 100 };
+
+        // Irányítás figyelése
+        window.addEventListener("keydown", e => keys[e.code] = true);
+        window.addEventListener("keyup", e => keys[e.code] = false);
+
+        // Kezdőállapot beállítása
+        function initPosition() {
+            x = 100 + Math.random() * 600;
+            y = 60;
+            vx = (Math.random() - 0.5) * 2;
+            vy = 0;
+            angle = 0;
+            fuel = 100;
+            gameOver = false;
+            keys = {}; 
+        }
+
+        function resetGame() {
+            lives = 3;
+            score = 0;
+            document.getElementById("score").innerText = score;
+            document.getElementById("lives").innerText = lives;
+            initPosition();
+        }
+
+        function mainLoop() {
+            // 1. Logika és Fizika frissítése
+            if (!gameOver) {
+                vy += gravity;
+
+                if (fuel > 0) {
+                    if (keys["ArrowLeft"]) angle -= rotationSpeed;
+                    if (keys["ArrowRight"]) angle += rotationSpeed;
+                    if (keys["ArrowUp"]) {
+                        vx += Math.sin(angle) * thrustPower;
+                        vy -= Math.cos(angle) * thrustPower;
+                        fuel -= 0.4;
+                    }
+                }
+
+                x += vx;
+                y += vy;
+
+                // Széleken átmenés
+                if (x < 0) x = canvas.width;
+                if (x > canvas.width) x = 0;
+
+                // UI adatok frissítése
+                document.getElementById("speed").innerText = Math.abs(vy).toFixed(2);
+                document.getElementById("fuel").innerText = Math.max(0, Math.floor(fuel));
+                document.getElementById("angle").innerText = Math.round(angle * (180/Math.PI)) % 360;
+
+                // Ütközés vizsgálat
+                if (y + 15 >= landingPad.y) {
+                    gameOver = true;
+                    const deg = Math.abs(angle * (180/Math.PI)) % 360;
+                    const isLandable = (deg < 15 || deg > 345);
+
+                    if (x > landingPad.x && x < landingPad.x + landingPad.width && vy < 1.2 && isLandable) {
+                        score += 100 + Math.floor(fuel);
+                        document.getElementById("score").innerText = score;
+                        setTimeout(() => { alert("SIKER! Tökéletes landolás."); initPosition(); }, 50);
+                    } else {
+                        lives--;
+                        document.getElementById("lives").innerText = lives;
+                        setTimeout(() => {
+                            if (lives <= 0) {
+                                alert("GAME OVER! Elfogytak az életek.");
+                                resetGame();
+                            } else {
+                                alert("BECSAPÓDÁS! Próbáld újra.");
+                                initPosition();
+                            }
+                        }, 50);
+                    }
+                }
+            }
+
+            // 2. Rajzolás (Minden képkockánál)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Platform rajzolása
+            ctx.fillStyle = "#ff4757";
+            ctx.fillRect(landingPad.x, landingPad.y, landingPad.width, 10);
+
+            // Kapszula (rakéta) rajzolása
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // Test
+            ctx.fillStyle = "#dfe6e9";
+            ctx.beginPath();
+            ctx.moveTo(-10, 10); ctx.lineTo(-10, -5);
+            ctx.quadraticCurveTo(0, -22, 10, -5); ctx.lineTo(10, 10);
+            ctx.fill();
+
+            // Ablak
+            ctx.fillStyle = "#3498db";
+            ctx.beginPath();
+            ctx.arc(0, -4, 4, 0, Math.PI*2);
+            ctx.fill();
+
+            // Hajtómű láng (Csak ha él a játék és van gáz)
+            if (!gameOver && keys["ArrowUp"] && fuel > 0) {
+                ctx.fillStyle = "orange";
+                ctx.beginPath();
+                ctx.moveTo(-5, 11); ctx.lineTo(5, 11); ctx.lineTo(0, 25);
+                ctx.fill();
+            }
+            ctx.restore();
+
+            requestAnimationFrame(mainLoop);
+        }
+
+        // Első indítás
+        initPosition();
+        mainLoop();
+    </script>
+</body>
+</html>
